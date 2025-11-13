@@ -24,7 +24,8 @@ data$ratio <- as.numeric(data$ratio)
 
 # đổi "ad." =  1, "nonad." = 0
 data$status <- ifelse(data$status == "ad.", 1, 0)
-
+# ép kiểu factor cho biến phân loại status
+data$status <- factor(data$status)
 
 # Thống kê số lượng giá trị NA theo từng cột
 na_counts <- colSums(is.na(data))
@@ -59,132 +60,160 @@ na_summary <- data.frame(
 )
 print(na_summary)
 
+
+# xử lý outlier bằng phương pháp IQR
+# Tính Q1, Q3, IQR cho height
+h_q1 <- quantile(data$height, 0.25, na.rm = TRUE)
+h_q3 <- quantile(data$height, 0.75, na.rm = TRUE)
+h_iqr <- h_q3 - h_q1
+
+
+# Tính Q1, Q3, IQR cho width
+w_q1 <- quantile(data$width, 0.25, na.rm = TRUE)
+w_q3 <- quantile(data$width, 0.75, na.rm = TRUE)
+w_iqr <- w_q3 - w_q1
+
+# Tạo ngưỡng dưới và trên cho height
+h_lower <- h_q1 - 1.5 * h_iqr
+h_upper <- h_q3 + 1.5 * h_iqr
+
+# Tạo ngưỡng dưới và trên cho width
+w_lower <- w_q1 - 1.5 * w_iqr
+w_upper <- w_q3 + 1.5 * w_iqr
+
+# Xác định outlier cho cả height và width
+is_outlier <- (data$height < h_lower | data$height > h_upper) |
+              (data$width  < w_lower  | data$width  > w_upper)
+
+# Lọc bỏ các outlier khỏi dữ liệu
+# data[row_index, column_index], vector 2 chiều
+data <- data[!is_outlier, ]
+head(data)
+
+
 ## THỐNG KÊ MÔ TẢ
 
 # Sử dụng thư viện 'psych' để thống kê mô tả các biến liên tục 'height', 'width', 'ratio'
 library(psych)
 # describe nằm trong thư viện psych
-describe(add_data[, c("height", "width", "ratio")], fast = TRUE)
-
+describe(data[, c("height", "width", "ratio")], fast = TRUE)
 
 # Vẽ Histogram cho 'height'
-hist(add_data$height,
+hist(data$height,
      main = "Histogram of Height",
      xlab = "Height",
      col = "skyblue",  # Màu sắc
      border = "white")  # Viền trắng
 
 # Vẽ Histogram cho 'width'
-hist(add_data$width,
+hist(data$width,
      main = "Histogram of Width",
      xlab = "Width",
      col = "salmon",
      border = "white")
 
 # Vẽ Histogram cho 'ratio'
-hist(add_data$ratio,
+hist(data$ratio,
      main = "Histogram of Ratio",
      xlab = "Ratio",
      col = "lightgreen",
      border = "white")
 
-# Thống kê số lượng của biến phân loại 'target'
-table(add_data$target)
-# Đếm số lượng từng loại trong 'target' (0 và 1)
-target_counts <- table(add_data$target)
+# Thống kê số lượng của biến phân loại theo status
+table(data$status)
+# Đếm số lượng từng loại trong 'status' (0 và 1)
+status_count <- table(data$status)
 
-# Vẽ Barplot cho 'target'
-barplot(target_counts,
-        main = "Barplot of Target",
+# Vẽ Barplot cho 'status'
+barplot(status_count,
+        main = "Barplot of Status",
         names.arg = c("Non-Ad", "Ad"),
         col = c("gray", "orange"),
         ylab = "Frequency")
 
-# Vẽ Boxplot cho 'height' theo 'target'
-boxplot(height ~ target, data = add_data,
-        main = "Boxplot of Height by Target",
-        xlab = "Target", ylab = "Height",
+# Vẽ Boxplot cho 'height' theo 'Status'
+boxplot(height ~ status, data = data,
+        main = "Boxplot of Height by Status",
+        xlab = "Status", ylab = "Height",
         col = c("lightgray", "lightblue"),
         names = c("Non-Ad (0)", "Ad (1)"))
 
-# Vẽ Boxplot cho 'width' theo 'target'
-boxplot(width ~ target, data = add_data,
-        main = "Boxplot of Width by Target",
-        xlab = "Target", ylab = "Width",
+# Vẽ Boxplot cho 'width' theo 'Status'
+boxplot(width ~ status, data = data,
+        main = "Boxplot of Width by Status",
+        xlab = "Status", ylab = "Width",
         col = c("lightgray", "lightgreen"),
         names = c("Non-Ad (0)", "Ad (1)"))
 
-# Vẽ Boxplot cho 'ratio' theo 'target'
-boxplot(ratio ~ target, data = add_data,
-        main = "Boxplot of Ratio by Target",
-        xlab = "Target", ylab = "Ratio",
+# Vẽ Boxplot cho 'ratio' theo 'Status'
+boxplot(ratio ~ status, data = data,
+        main = "Boxplot of Ratio by Status",
+        xlab = "Status", ylab = "Ratio",
         col = c("lightgray", "lightpink"),
         names = c("Non-Ad (0)", "Ad (1)"))
 
 # Mô hình hồi quy logistic theo 'height'
-model_height <- glm(target ~ height, data = add_data, family = "binomial")
+model_height <- glm(status ~ height, data = data, family = "binomial")
 
-# Vẽ đồ thị phân tán giữa 'height' và 'target', sau đó vẽ đường cong logistic
-plot(add_data$height, add_data$target,
-     xlab = "Height", ylab = "Target",
-     main = "Logistic Regression: Target vs Height",
+# Vẽ đồ thị phân tán giữa 'height' và 'status', sau đó vẽ đường cong logistic
+plot(data$height, data$status,
+     xlab = "Height", ylab = "Status",
+     main = "Logistic Regression: Status vs Height",
      pch = 16, col = rgb(0, 0, 1, 0.3))  # Đồ thị phân tán
 
 curve(predict(model_height, newdata = data.frame(height = x), type = "response"),
       add = TRUE, col = "red", lwd = 2)  # Đường cong logistic
 
 # Mô hình hồi quy logistic theo 'width'
-model_width <- glm(target ~ width, data = add_data, family = "binomial")
+model_width <- glm(status ~ width, data = data, family = "binomial")
 
-plot(add_data$width, add_data$target,
-     xlab = "Width", ylab = "Target",
-     main = "Logistic Regression: Target vs Width",
+plot(data$width, data$status,
+     xlab = "Width", ylab = "Status",
+     main = "Logistic Regression: Status vs Width",
      pch = 16, col = rgb(0, 0.5, 0, 0.3))
 
 curve(predict(model_width, newdata = data.frame(width = x), type = "response"),
       add = TRUE, col = "red", lwd = 2)
 
 # Mô hình hồi quy logistic theo 'ratio'
-model_ratio <- glm(target ~ ratio, data = add_data, family = "binomial")
+model_ratio <- glm(status ~ ratio, data = data, family = "binomial")
 
-plot(add_data$ratio, add_data$target,
-     xlab = "Ratio", ylab = "Target",
-     main = "Logistic Regression: Target vs Ratio",
+plot(data$ratio, data$status,
+     xlab = "Ratio", ylab = "Status",
+     main = "Logistic Regression: Status vs Ratio",
      pch = 16, col = rgb(0.7, 0, 0, 0.3))
 
 curve(predict(model_ratio, newdata = data.frame(ratio = x), type = "response"),
       add = TRUE, col = "red", lwd = 2)
 
-
 # Tính ma trận tương quan giữa các biến liên tục 'height', 'width', 'ratio'
 library(corrplot)
-cor_matrix <- cor(add_data[, c("height", "width", "ratio")], use = "complete.obs")
+cor_matrix <- cor(data[, c("height", "width", "ratio")], use = "complete.obs")
 
 # Vẽ biểu đồ ma trận tương quan
 corrplot(cor_matrix, method = "circle", type = "upper",
          addCoef.col = "black", tl.col = "black", number.cex = 0.8,
          title = "Correlation Matrix", mar = c(0,0,1,0))
 
-
 ## THỐNG KÊ SUY DIỄN:
 # Thiết lập lại ngẫu nhiên với set.seed để tái lập kết quả
 set.seed(123)
 
 # Chia bộ dữ liệu thành train (70%) và test (30%)
-sample_index <- sample(1:nrow(add_data), size = 0.7 * nrow(add_data))
-train_data <- add_data[sample_index, ]
-test_data <- add_data[-sample_index, ]
+sample_index <- sample(1:nrow(data), size = 0.7 * nrow(data))
+train_data <- data[sample_index, ]
+test_data <- data[-sample_index, ]
 
 # Xây dựng mô hình logistic với 'height' và 'width'
-model_hw <- glm(target ~ height + width, data = train_data, family = binomial)
+model_hw <- glm(status ~ height + width, data = train_data, family = binomial)
 summary(model_hw)
 
 # Mô hình logistic với 'width' duy nhất
-model_hw2 <- glm(target ~ width, data = train_data, family = binomial)
+model_hw2 <- glm(status ~ width, data = train_data, family = binomial)
 summary(model_hw2)
 
 # Mô hình logistic với 'ratio'
-model_ratio <- glm(target ~ ratio, data = train_data, family = binomial)
+model_ratio <- glm(status ~ ratio, data = train_data, family = binomial)
 summary(model_ratio)
 
 # Hàm đánh giá mô hình
@@ -192,7 +221,7 @@ evaluate_model <- function(model, data, label) {
   pred_prob <- predict(model, newdata = data, type = "response")
   pred_class <- ifelse(pred_prob > 0.5, 1, 0)
   
-  actual <- data$target
+  actual <- data$status
   accuracy <- mean(pred_class == actual)
   
   cat(paste0(label, ":\n"))
@@ -216,8 +245,8 @@ prob_hw <- predict(model_hw2, newdata = test_data, type = "response")
 prob_ratio <- predict(model_ratio, newdata = test_data, type = "response")
 
 # Vẽ ROC
-roc_hw <- roc(test_data$target, prob_hw)
-roc_ratio <- roc(test_data$target, prob_ratio)
+roc_hw <- roc(test_data$status, prob_hw)
+roc_ratio <- roc(test_data$status, prob_ratio)
 
 # Vẽ biểu đồ so sánh
 plot(roc_hw, col = "blue", lwd = 2, main = "ROC Curve Comparison")
@@ -228,3 +257,42 @@ legend("bottomright", legend = c("Model 1: width", "Model 2: ratio"),
 # In AUC
 cat("AUC Model 1 (width): ", auc(roc_hw), "\n")
 cat("AUC Model 2 (ratio): ", auc(roc_ratio), "\n")
+
+
+## RANDOM FOREST
+
+library(randomForest)
+
+set.seed(123)
+
+# Train mô hình Random Forest
+rf_model <- randomForest(
+  status ~ height + width + ratio,
+  data = train_data,
+  ntree = 500,
+  importance = TRUE
+)
+
+print(rf_model)
+
+# Dự đoán xác suất (probabilities)
+rf_prob <- predict(rf_model, newdata = test_data, type = "prob")[,2]
+
+# Chuyển xác suất thành phân loại 0/1
+rf_class <- ifelse(rf_prob > 0.5, 1, 0)
+
+# Độ chính xác
+cat("Random Forest Accuracy:", mean(rf_class == test_data$status), "\n")
+
+# Ma trận nhầm lẫn
+print(table(Predicted = rf_class, Actual = test_data$status))
+
+# Vẽ ROC
+roc_rf <- roc(test_data$status, rf_prob)
+plot(roc_rf, col="darkgreen", main="ROC - Random Forest")
+
+# In AUC
+auc(roc_rf)
+
+# Vẽ biểu đồ độ quan trọng biến
+varImpPlot(rf_model)
