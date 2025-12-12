@@ -322,6 +322,7 @@ rf_prob <- predict(rf_model, newdata = test_data, type = "prob")[, "1"]
 
 # Ma trận nhầm lẫn + độ đo tổng hợp
 rf_cm <- confusionMatrix(rf_pred_class, test_data$status, positive = "1")
+print(rf_cm)
 
 rf_accuracy <- rf_cm$overall["Accuracy"]
 rf_sensitivity <- rf_cm$byClass["Sensitivity"]
@@ -350,5 +351,9 @@ varImpPlot(rf_model,
            main = "ĐỘ QUAN TRỌNG CỦA BIẾN - RANDOM FOREST",
            col = "darkblue")
 
-print("Độ quan trọng của các biến:")
-print(var_importance)
+y_true <- ifelse(test_data$status == "1", 1, 0)
+mae <- mean(abs(y_true - rf_prob))
+rmse <- sqrt(mean((y_true - rf_prob)^2))
+
+print(paste("MAE:", round(mae, 4)))
+print(paste("RMSE:", round(rmse, 4)))
