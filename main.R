@@ -1,7 +1,12 @@
 ## TIEN XU LY DU LIEU
 
-# Đọc dữ liệu từ file CSV
 library(dplyr)
+library(pROC)
+library(randomForest)
+library(caret)
+
+# Đọc dữ liệu từ file CSV
+
 
 data <- read.csv("~/Downloads/add.csv")
 
@@ -55,8 +60,10 @@ update_ratio <- function(df) {
   return(df)
 }
 data <- update_ratio(data)
-print(data, c('height', 'width', 'ratio', 'status'))
+print(data[, c('height', 'width', 'ratio', 'status')])
 
+na_counts_after_median <- colSums(is.na(data))
+print(sum(na_counts))
 
 View(data)
 
@@ -282,7 +289,6 @@ evaluate_model <- function(model, best_threshold, data, label) {
 # Đánh giá mô hình
 evaluate_model(model_w, best_threshold_w, test_data, "Model 1 (Width)")
 evaluate_model(model_ratio, best_threshold_ratio, test_data, "Model 2 (Ratio)")
-library(pROC)
 # Vẽ biểu đồ Roc curve model 1
 prob_w <- predict(model_w, newdata = test_data, type = "response")
 roc_w <- roc(test_data$status, prob_w)
@@ -306,8 +312,6 @@ legend("bottomright", legend = c("Model 1: width", "Model 2: ratio"),
        col = c("blue", "orange"), lwd = 2)
 
 ## RANDOM FOREST
-library(randomForest)
-library(caret)
 set.seed(8)
 
 rf_model <- randomForest(
