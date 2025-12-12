@@ -1,6 +1,8 @@
 ## TIEN XU LY DU LIEU
 
 # Đọc dữ liệu từ file CSV
+library(dplyr)
+
 data <- read.csv("~/Downloads/add.csv")
 
 data <- rename(data, "height" = "X0")
@@ -53,7 +55,9 @@ update_ratio <- function(df) {
   return(df)
 }
 data <- update_ratio(data)
-print(data)
+print(data, c('height', 'width', 'ratio', 'status'))
+
+
 View(data)
 
 
