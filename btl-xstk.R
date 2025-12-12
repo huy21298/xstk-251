@@ -2,12 +2,12 @@
 
 # Đọc dữ liệu từ file CSV
 raw_data <- read.csv("~/Downloads/add.csv")
-View(raw_data)
+# View(raw_data)
 
-# Loại bỏ cột ID đầu tiên
-data <- raw_data[, -1]
-# Xóa các cột từ thứ 4 đến thứ 1558, giữ lại cột cuối cùng chứa ad. , nonad.
-data <- data[, -c(4:1558)]
+# # Loại bỏ cột ID đầu tiên
+# data <- raw_data[, -1]
+# # Xóa các cột từ thứ 4 đến thứ 1558, giữ lại cột cuối cùng chứa ad. , nonad.
+# data <- data[, -c(4:1558)]
 
 # Đổi tên cột: 'height', 'width', 'ratio', 'status'
 colnames(data) <- c("height", "width", "ratio", "status")
@@ -60,7 +60,6 @@ na_summary <- data.frame(
 )
 print(na_summary)
 
-
 # xử lý outlier bằng phương pháp IQR
 # Tính Q1, Q3, IQR cho height
 h_q1 <- quantile(data$height, 0.25, na.rm = TRUE)
@@ -89,7 +88,6 @@ is_outlier <- (data$height < h_lower | data$height > h_upper) |
 # data[row_index, column_index], vector 2 chiều
 data <- data[!is_outlier, ]
 head(data)
-
 
 ## THỐNG KÊ MÔ TẢ
 
@@ -193,14 +191,14 @@ cor_matrix <- cor(data[, c("height", "width", "ratio")], use = "complete.obs")
 # Vẽ biểu đồ ma trận tương quan
 corrplot(cor_matrix, method = "circle", type = "upper",
          addCoef.col = "black", tl.col = "black", number.cex = 0.8,
-         title = "Correlation Matrix", mar = c(0,0,1,0))
+         title = "Correlation Matrix", mar = c(0, 0, 1, 0))
 
 ## THỐNG KÊ SUY DIỄN:
 # Thiết lập lại ngẫu nhiên với set.seed để tái lập kết quả
 set.seed(123)
 
 # Chia bộ dữ liệu thành train (70%) và test (30%)
-sample_index <- sample(1:nrow(data), size = 0.7 * nrow(data))
+sample_index <- sample(seq_len(nrow(data)), size = 0.7 * nrow(data))
 train_data <- data[sample_index, ]
 test_data <- data[-sample_index, ]
 
@@ -209,8 +207,8 @@ model_hw <- glm(status ~ height + width, data = train_data, family = binomial)
 summary(model_hw)
 
 # Mô hình logistic với 'width' duy nhất
-model_hw2 <- glm(status ~ width, data = train_data, family = binomial)
-summary(model_hw2)
+model_w <- glm(status ~ width, data = train_data, family = binomial)
+summary(model_w)
 
 # Mô hình logistic với 'ratio'
 model_ratio <- glm(status ~ ratio, data = train_data, family = binomial)
@@ -220,10 +218,8 @@ summary(model_ratio)
 evaluate_model <- function(model, data, label) {
   pred_prob <- predict(model, newdata = data, type = "response")
   pred_class <- ifelse(pred_prob > 0.5, 1, 0)
-  
   actual <- data$status
   accuracy <- mean(pred_class == actual)
-  
   cat(paste0(label, ":\n"))
   cat("Accuracy: ", round(accuracy, 4), "\n")
   cat("Confusion Matrix:\n")
@@ -232,20 +228,20 @@ evaluate_model <- function(model, data, label) {
 }
 
 # Đánh giá mô hình
-evaluate_model(model_hw2, test_data, "Model 1 (width)")
-evaluate_model(model_ratio, test_data, "Model 2 (ratio)")
+evaluate_model(model_w, test_data, "Model width only")
+evaluate_model(model_ratio, test_data, "Model ratio only")
 
 # In ra AIC của các mô hình
-cat("AIC Model 1 ( width): ", AIC(model_hw2), "\n")
+cat("AIC Model 1 ( width): ", AIC(model_w), "\n")
 cat("AIC Model 2 (ratio): ", AIC(model_ratio), "\n")
 
 library(pROC)
 # Dự đoán xác suất trên tập test
-prob_hw <- predict(model_hw2, newdata = test_data, type = "response")
+prob_w <- predict(model_w, newdata = test_data, type = "response")
 prob_ratio <- predict(model_ratio, newdata = test_data, type = "response")
 
 # Vẽ ROC
-roc_hw <- roc(test_data$status, prob_hw)
+roc_hw <- roc(test_data$status, prob_w)
 roc_ratio <- roc(test_data$status, prob_ratio)
 
 # Vẽ biểu đồ so sánh
@@ -258,41 +254,71 @@ legend("bottomright", legend = c("Model 1: width", "Model 2: ratio"),
 cat("AUC Model 1 (width): ", auc(roc_hw), "\n")
 cat("AUC Model 2 (ratio): ", auc(roc_ratio), "\n")
 
-
-## RANDOM FOREST
-
+#------------------------------------------
+# RANDOM FOREST PHÂN LOẠI (phiên bản nâng cao)
+#------------------------------------------
 library(randomForest)
+library(caret)
+set.seed(8)
 
-set.seed(123)
+# Chọn mtry dựa trên số biến giải thích
+mtry_val <- max(1, floor(sqrt(ncol(train_data) - 1)))
 
-# Train mô hình Random Forest
 rf_model <- randomForest(
-  status ~ height + width + ratio,
+  status ~ .,
   data = train_data,
   ntree = 500,
-  importance = TRUE
+  mtry = mtry_val,
+  importance = TRUE,
+  proximity = FALSE
 )
 
+cat("Random Forest summary:\n")
 print(rf_model)
 
-# Dự đoán xác suất (probabilities)
-rf_prob <- predict(rf_model, newdata = test_data, type = "prob")[,2]
+# Dự đoán lớp và xác suất trên tập test
+rf_pred_class <- predict(rf_model, newdata = test_data)
+rf_prob <- predict(rf_model, newdata = test_data, type = "prob")[, "1"]
 
-# Chuyển xác suất thành phân loại 0/1
-rf_class <- ifelse(rf_prob > 0.5, 1, 0)
+# Ma trận nhầm lẫn + độ đo tổng hợp
+rf_cm <- confusionMatrix(rf_pred_class, test_data$status, positive = "1")
+cat("Confusion matrix (positive = 1):\n")
+print(rf_cm)
 
-# Độ chính xác
-cat("Random Forest Accuracy:", mean(rf_class == test_data$status), "\n")
+rf_accuracy <- rf_cm$overall["Accuracy"]
+rf_sensitivity <- rf_cm$byClass["Sensitivity"]
+rf_specificity <- rf_cm$byClass["Specificity"]
 
-# Ma trận nhầm lẫn
-print(table(Predicted = rf_class, Actual = test_data$status))
+cat("Accuracy: ", rf_accuracy, "\n")
+cat("Sensitivity (Recall for class 1): ", rf_sensitivity, "\n")
+cat("Specificity: ", rf_specificity, "\n")
 
-# Vẽ ROC
-roc_rf <- roc(test_data$status, rf_prob)
-plot(roc_rf, col="darkgreen", main="ROC - Random Forest")
+# ROC + AUC cho Random Forest và so sánh với logistic (ratio)
+rf_roc <- roc(test_data$status, rf_prob, levels = c("0", "1"), direction = "<")
+rf_auc <- auc(rf_roc)
+cat("AUC Random Forest: ", rf_auc, "\n")
 
-# In AUC
-auc(roc_rf)
+plot(roc_ratio, main = "So sánh ROC: Logistic (ratio) vs Random Forest",
+     col = "steelblue", lwd = 2)
+lines(rf_roc, col = "firebrick", lwd = 2)
+legend("bottomright",
+       legend = c(paste0("Logistic (AUC = ", round(auc(roc_ratio), 3), ")"),
+                  paste0("Random Forest (AUC = ", round(rf_auc, 3), ")")),
+       col = c("steelblue", "firebrick"),
+       lwd = 2)
 
-# Vẽ biểu đồ độ quan trọng biến
-varImpPlot(rf_model)
+# Độ quan trọng của biến
+var_importance <- importance(rf_model)
+varImpPlot(rf_model,
+           main = "Độ quan trọng biến - Random Forest",
+           col = "darkblue")
+
+cat("Độ quan trọng của biến:\n")
+print(var_importance)
+
+# Sai số dự báo xác suất (đơn vị xác suất 0-1)
+y_true <- as.numeric(as.character(test_data$status))
+rf_mae <- mean(abs(y_true - rf_prob))
+rf_rmse <- sqrt(mean((y_true - rf_prob)^2))
+cat("MAE: ", rf_mae, "\n")
+cat("RMSE: ", rf_rmse, "\n")
