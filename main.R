@@ -4,6 +4,7 @@ library(dplyr)
 library(pROC)
 library(randomForest)
 library(caret)
+library(corrplot)
 
 # Đọc dữ liệu từ file CSV
 
@@ -212,7 +213,6 @@ curve(predict(model_ratio, newdata = data.frame(ratio = x), type = "response"),
       add = TRUE, col = "red", lwd = 2)
 
 # Tính ma trận tương quan giữa các biến liên tục 'height', 'width', 'ratio'
-library(corrplot)
 cor_matrix <- cor(data[, c("height", "width", "ratio")], use = "complete.obs")
 
 # Vẽ biểu đồ ma trận tương quan
